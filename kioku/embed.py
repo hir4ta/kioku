@@ -65,6 +65,19 @@ class EmbedResult:
     cached: bool
 
 
+@dataclass(slots=True, frozen=True)
+class RerankResult:
+    """One rerank hit.
+
+    ``index`` references the candidate's position in the input
+    ``documents`` list so the caller can map back to chunk_ids etc.
+    ``score`` is Voyage's relevance score in [0, 1].
+    """
+
+    index: int
+    score: float
+
+
 # ---------------------------------------------------------------------------
 # Hashing
 # ---------------------------------------------------------------------------
@@ -119,6 +132,7 @@ class Embedder:
         api_key: str,
         model_general: str = "voyage-4-large",
         model_code: str = "voyage-code-3",
+        model_rerank: str = "rerank-2.5",
         dim: int = 1024,
         cache_get: CacheGet | None = None,
         cache_put: CachePut | None = None,
@@ -126,6 +140,7 @@ class Embedder:
         self._client = voyageai.Client(api_key=api_key)  # type: ignore[attr-defined]
         self._model_general = model_general
         self._model_code = model_code
+        self._model_rerank = model_rerank
         self._dim = dim
         self._cache_get: CacheGet = cache_get or (lambda _h, _m: None)
         self._cache_put: CachePut = cache_put or (lambda _h, _m, _v: None)
@@ -136,6 +151,53 @@ class Embedder:
     @property
     def dim(self) -> int:
         return self._dim
+
+    @property
+    def rerank_model(self) -> str:
+        return self._model_rerank
+
+    def rerank(
+        self,
+        query: str,
+        documents: list[str],
+        *,
+        model: str | None = None,
+        top_k: int | None = None,
+    ) -> list[RerankResult]:
+        """Re-order ``documents`` against ``query`` via Voyage rerank-2.5.
+
+        Returns :class:`RerankResult` entries ordered by ``score``
+        descending. ``index`` references the original position in
+        ``documents`` so callers can map results back to their own
+        identifiers without round-tripping the body text.
+
+        ``top_k`` defaults to ``len(documents)`` (return the full
+        re-ordering). Pass a smaller value if the caller only wants
+        the top hits and is OK discarding the tail.
+        """
+        if not documents:
+            return []
+
+        chosen_model = model or self._model_rerank
+        k = top_k if top_k is not None else len(documents)
+
+        try:
+            response: Any = self._client.rerank(
+                query=query,
+                documents=documents,
+                model=chosen_model,
+                top_k=k,
+            )
+        except Exception as exc:
+            log.warning("voyage rerank failed: %s", exc)
+            raise EmbedError(str(exc)) from exc
+
+        results = getattr(response, "results", None)
+        if results is None:
+            raise EmbedError(
+                f"voyage rerank response missing 'results' (got {type(response).__name__})"
+            )
+        return [RerankResult(index=int(r.index), score=float(r.relevance_score)) for r in results]
 
     def embed(
         self,
