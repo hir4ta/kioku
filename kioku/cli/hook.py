@@ -34,7 +34,18 @@ from kioku.inject import (
     InjectionPayload,
     format_payload,
 )
+from kioku.retrieve import hybrid_search
+from kioku.store_sqlite import connect
 from kioku.vault import first_heading, read_memory, read_plain_markdown
+
+# Maximum chars of the focus body fed into BM25 as a retrieval query.
+# Longer queries hurt both BM25 idf and our 2-second hook budget.
+_QUERY_MAX_CHARS = 1000
+
+# Top-K identifier-only hits to append to query_relevant on session start.
+# Identifier-only keeps the per-hit token cost in the low-tens range, so
+# even a generous K stays under the budget cap with room to spare.
+_QUERY_RELEVANT_TOP_K = 3
 
 log = logging.getLogger("kioku.hook")
 
@@ -169,6 +180,7 @@ def _build_session_start_payload(
             identifier_only=True,
             names=("focus", "next", "unresolved"),
         )
+        _append_query_relevant_bm25(payload, settings, vault_root / "working" / "focus.md")
         return payload
 
     # source in {"startup", "clear"}
@@ -185,6 +197,7 @@ def _build_session_start_payload(
         names=("next", "unresolved"),
     )
     _append_active_decisions_index(payload, vault_root)
+    _append_query_relevant_bm25(payload, settings, vault_root / "working" / "focus.md")
     return payload
 
 
@@ -257,6 +270,76 @@ def _append_compact_handover(
             body=body,
         )
     )
+
+
+def _hook_db_path() -> Path:
+    """Mirror of :func:`kioku.cli.main._db_path`.
+
+    Replicated to avoid a circular import between ``cli.main`` and
+    ``cli.hook``. Keep in sync if either changes.
+    """
+    return Path.home() / ".local" / "share" / "kioku" / "store" / "kioku.sqlite"
+
+
+def _append_query_relevant_bm25(
+    payload: InjectionPayload,
+    settings: KiokuSettings,
+    query_source_path: Path,
+) -> None:
+    """BM25-only retrieval prefetch for the ``query_relevant`` layer.
+
+    Reads ``query_source_path`` (typically ``working/focus.md``), uses
+    its body as the query, runs ``hybrid_search`` in BM25-only mode
+    (``embedder=None`` ⇒ no Voyage API call, no rerank, no stall risk),
+    and appends the top hits as identifier-only memories.
+
+    Fail-open: anything that goes wrong (missing focus, no store,
+    query empty, search error) is logged and skipped — the caller's
+    payload is unchanged.
+    """
+    if not query_source_path.is_file():
+        return
+
+    db_path = _hook_db_path()
+    if not db_path.is_file():
+        log.debug("query_relevant skipped: store not initialized at %s", db_path)
+        return
+
+    try:
+        query = read_plain_markdown(query_source_path)
+    except KiokuError as exc:
+        log.debug("query_relevant skipped (%s): %s", query_source_path, exc)
+        return
+    query = query.strip()[:_QUERY_MAX_CHARS]
+    if not query:
+        return
+
+    try:
+        with connect(db_path) as conn:
+            hits = hybrid_search(
+                conn,
+                query,
+                settings=settings,
+                embedder=None,  # BM25-only — no Voyage call from a hot hook
+                enable_rerank=False,
+                top_k=_QUERY_RELEVANT_TOP_K,
+            )
+    except Exception as exc:
+        log.warning("query_relevant search failed: %s", exc)
+        return
+
+    for hit in hits:
+        payload.query_relevant.append(
+            InjectedMemory(
+                id=hit.memory_id,
+                source="auto-extracted",
+                trust="medium",
+                event_at="",
+                vault_path=hit.vault_path,
+                title=hit.section,
+                body=None,  # identifier-only — kioku.read can pull the body if needed
+            )
+        )
 
 
 def _append_active_decisions_index(

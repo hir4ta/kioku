@@ -30,7 +30,8 @@ from kioku.chunk import chunk_body
 from kioku.cli.hook import hook as hook_group
 from kioku.config import get_voyage_api_key, load_settings
 from kioku.embed import Embedder, content_hash
-from kioku.errors import KiokuError
+from kioku.errors import ConfigError, KiokuError
+from kioku.retrieve import hybrid_search
 from kioku.store_sqlite import (
     ChunkInsert,
     cache_get,
@@ -38,7 +39,6 @@ from kioku.store_sqlite import (
     connect,
     init_schema,
     insert_chunks,
-    search_bm25,
     stats,
     upsert_memory,
 )
@@ -196,16 +196,65 @@ def rebuild() -> None:
 @click.argument("query", required=True)
 @click.option("--top-k", default=5, show_default=True, help="Number of hits to return.")
 @click.option("--project", default=None, help="Limit to a single project slug.")
-def search(query: str, top_k: int, project: str | None) -> None:
-    """Phase 1: BM25-only search. Phase 3 adds dense + Voyage rerank."""
+@click.option(
+    "--no-rerank",
+    is_flag=True,
+    help="Skip Voyage rerank-2.5 (faster, slightly less precise ordering).",
+)
+@click.option(
+    "--bm25-only",
+    is_flag=True,
+    help="Skip dense embedding and rerank entirely — no Voyage API call.",
+)
+def search(
+    query: str,
+    top_k: int,
+    project: str | None,
+    no_rerank: bool,
+    bm25_only: bool,
+) -> None:
+    """Hybrid search: BM25 + dense + Voyage rerank-2.5 + composite scoring.
+
+    Gracefully degrades to BM25-only when no Voyage API key is set.
+    """
     settings = load_settings()
     db_path = _db_path(settings.vault_path)
     if not db_path.is_file():
         console.print("[yellow]store not initialized — run `kioku rebuild` first[/yellow]")
         sys.exit(1)
 
+    api_key: str | None = None
+    if not bm25_only:
+        try:
+            api_key = get_voyage_api_key(settings)
+        except ConfigError as exc:
+            console.print(
+                f"[yellow]Voyage API key not available; falling back to BM25-only "
+                f"({exc.__class__.__name__})[/yellow]"
+            )
+
     with connect(db_path) as conn:
-        hits = search_bm25(conn, query, limit=top_k, project=project)
+        embedder: Embedder | None = None
+        if api_key is not None:
+            embedder = Embedder(
+                api_key=api_key,
+                model_general=settings.voyage.model_general,
+                model_code=settings.voyage.model_code,
+                model_rerank=settings.voyage.model_rerank,
+                dim=settings.voyage.dim,
+                cache_get=lambda h, m: cache_get(conn, h, m),
+                cache_put=lambda h, m, v: cache_put(conn, h, m, v),
+            )
+
+        hits = hybrid_search(
+            conn,
+            query,
+            settings=settings,
+            project=project,
+            embedder=embedder,
+            enable_rerank=(not no_rerank) and embedder is not None,
+            top_k=top_k,
+        )
 
     if not hits:
         console.print("[yellow]no hits[/yellow]")
@@ -214,11 +263,21 @@ def search(query: str, top_k: int, project: str | None) -> None:
     table = Table(show_header=True, header_style="bold")
     table.add_column("memory_id", style="cyan", no_wrap=True)
     table.add_column("section")
-    table.add_column("score", justify="right")
+    table.add_column("composite", justify="right")
+    table.add_column("rrf", justify="right")
+    table.add_column("rerank", justify="right")
     table.add_column("body")
     for h in hits:
-        body_preview = h.body.replace("\n", " ")[:80]
-        table.add_row(h.memory_id, h.section, f"{h.score:.3f}", body_preview)
+        body_preview = h.body.replace("\n", " ")[:60]
+        rerank_str = f"{h.rerank_score:.3f}" if h.rerank_score is not None else "—"
+        table.add_row(
+            h.memory_id,
+            h.section,
+            f"{h.composite_score:.3f}",
+            f"{h.rrf_score:.3f}",
+            rerank_str,
+            body_preview,
+        )
     console.print(table)
 
 
