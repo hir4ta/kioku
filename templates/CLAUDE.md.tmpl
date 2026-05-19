@@ -35,6 +35,28 @@ Mark content you don't want indexed with `<no-memory>...</no-memory>` or `<priva
 - Run `kioku status` to see what kioku injected into your most recent session.
 - Run `kioku rebuild` if you bulk-edited files outside kioku and want the SQLite index regenerated.
 
+## Keeping `working/` honest (instructions to future-Claude)
+
+During an active Claude Code session, **you (Claude) are responsible for
+keeping `working/focus.md`, `working/next.md`, and `working/unresolved.md`
+up to date**. These three files are auto-injected into every new
+session, so they're the user's primary handoff mechanism.
+
+Before ending a session (or any time the focus shifts materially):
+
+- `working/focus.md` — one short paragraph: what is the user currently
+  working on? Overwrite, don't append.
+- `working/next.md` — one specific, executable next action. *"Write
+  the concurrent-invalidation test for `cache.ts`"*, not *"continue
+  the cache work"*. Overwrite.
+- `working/unresolved.md` — bullet list of open questions / blockers /
+  half-finished work. Append new items, remove resolved ones.
+
+These files are plain Markdown — no frontmatter required. kioku does
+the auto-extracted `episodic/sessions/*.md` summary on the SessionEnd
+hook; your job is the higher-signal `working/` files that the next
+session reads first.
+
 ## Trust model
 
 Memories carry a `trust` frontmatter field:
