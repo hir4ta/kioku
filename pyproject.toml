@@ -1,0 +1,141 @@
+[project]
+name = "kioku"
+version = "0.0.1"
+description = "Persistent long-term memory for Claude Code via Obsidian vault + Voyage embeddings + lifecycle hooks."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Shunichi Hirata" }]
+requires-python = ">=3.12"
+keywords = [
+  "memory", "long-term-memory", "voyage", "obsidian",
+  "rag", "semantic-search", "hooks", "ai-agent", "claude-code",
+]
+
+dependencies = [
+  "voyageai>=0.3",
+  "sqlite-vec>=0.1.10",
+  "duckdb>=1.1",
+  "anthropic>=0.39",
+  "python-frontmatter>=1.1",
+  "pydantic>=2.9",
+  "httpx>=0.28",
+  "tenacity>=9.0",
+  "keyring>=25.0",
+  "tomli-w>=1.0",
+  "click>=8.1",
+  "rich>=13.9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "pytest-cov>=6.0",
+  "ruff>=0.8",
+  "mypy>=1.13",
+  "types-python-frontmatter",
+  "hypothesis>=6.115",
+]
+
+[project.scripts]
+kioku = "kioku.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lib"]
+include = ["lib/**/*.py"]
+
+# ---------------------------------------------------------------------------
+# ruff (lint + format)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["lib", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # isort
+  "B",        # bugbear
+  "UP",       # pyupgrade
+  "N",        # pep8-naming
+  "S",        # bandit
+  "C4",       # comprehensions
+  "PT",       # pytest style
+  "RET",      # return statements
+  "SIM",      # simplify
+  "ARG",      # unused-args
+  "PL",       # pylint subset
+  "RUF",      # ruff-specific
+]
+ignore = [
+  "E501",   # line length (formatter handles it)
+  "S101",   # assert ok in tests
+  "PLR0913", # too many args
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PLR2004"]
+"lib/_scratch/**" = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["voyageai.*", "sqlite_vec.*", "frontmatter.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+asyncio_mode = "auto"
+addopts = [
+  "--strict-markers",
+  "--strict-config",
+  "-ra",
+]
+markers = [
+  "unit: fast unit tests",
+  "integration: integration tests (touch sqlite, duckdb, vault)",
+  "voyage: tests that call Voyage API (require VOYAGE_API_KEY, skipped otherwise)",
+  "claude_cli: tests that spawn `claude -p` (require Claude Code installed, skipped otherwise)",
+]
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["lib"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "raise NotImplementedError",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+]

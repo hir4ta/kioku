@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hir4ta/kioku/schemas/benchmark-result.schema.json",
+  "title": "kiokuBenchmarkResult",
+  "description": "Weekly LongMemEval-style benchmark output (arxiv 2410.10813). Written to vault/_meta/benchmark/<YYYY-WW>.json by the benchmark-run cron.",
+  "type": "object",
+  "required": ["timestamp", "kioku_version", "results"],
+  "additionalProperties": false,
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kioku_version": {
+      "type": "string",
+      "description": "Plugin version at the time of the run."
+    },
+    "vault_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "total_memories": {"type": "integer"},
+        "active_memories": {"type": "integer"},
+        "deprecated_memories": {"type": "integer"},
+        "archived_memories": {"type": "integer"},
+        "by_type": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        },
+        "by_project": {
+          "type": "object",
+          "additionalProperties": {"type": "integer"}
+        }
+      }
+    },
+    "voyage_cost_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Cumulative Voyage spend for the benchmark window."
+    },
+    "results": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "LongMemEval five-axis results.",
+      "properties": {
+        "single_session_extraction": {"$ref": "#/$defs/scoreSection"},
+        "multi_session_synthesis":   {"$ref": "#/$defs/scoreSection"},
+        "temporal_reasoning":        {"$ref": "#/$defs/scoreSection"},
+        "knowledge_update":          {"$ref": "#/$defs/scoreSection"},
+        "abstention":                {"$ref": "#/$defs/scoreSection"}
+      }
+    },
+    "regressions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["axis", "delta", "previous_score", "current_score"],
+        "properties": {
+          "axis": {"type": "string"},
+          "delta": {"type": "number"},
+          "previous_score": {"type": "number"},
+          "current_score": {"type": "number"},
+          "notes": {"type": "string"}
+        }
+      },
+      "description": "Filled by the benchmark cron when this run scores lower than the previous one on any axis."
+    }
+  },
+  "$defs": {
+    "scoreSection": {
+      "type": "object",
+      "required": ["score", "n_questions", "n_correct"],
+      "properties": {
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "n_questions": {"type": "integer", "minimum": 0},
+        "n_correct": {"type": "integer", "minimum": 0},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,234 @@
+# Taskfile for the kioku monorepo.
+#
+# Why Taskfile:
+#   - Single entry point across heterogeneous tooling: Python (uv), bash,
+#     bats, npm (dashboard), gh CLI. Discoverable via `task --list`.
+#   - Sub-Taskfile composition: dashboard/Taskfile.yml will be included
+#     under `dashboard:` namespace once the dashboard ships (Phase 8-9).
+#
+# Conventions:
+#   - desc: present on every public task → shows in `task --list`.
+#   - Internal-only helpers use `internal: true`.
+#   - `task` is the DX layer. CI calls scripts/ directly so we never drift.
+#
+# Quickstart:
+#   task              # show menu
+#   task install      # uv sync --all-extras
+#   task lint         # ruff + mypy + shellcheck (whatever exists in this Phase)
+#   task test         # pytest + bats
+#   task validate     # lint + test (use before pushing)
+#   task doctor       # verify required tooling
+
+version: "3"
+
+set: [pipefail]
+silent: true
+
+# Sub-Taskfiles. Re-enable each as the corresponding directory ships:
+#   includes:
+#     dashboard:
+#       taskfile: ./dashboard/Taskfile.yml
+#       dir: ./dashboard
+
+tasks:
+  # ---------------------------------------------------------------
+  # Default — show task menu when invoked without arguments.
+  # ---------------------------------------------------------------
+  default:
+    desc: List available tasks (this menu)
+    cmds:
+      - task --list
+
+  # ---------------------------------------------------------------
+  # Install / setup
+  # ---------------------------------------------------------------
+  install:
+    desc: Install Python dependencies (uv sync --all-extras)
+    cmds:
+      - uv sync --all-extras
+
+  format:
+    desc: Auto-format Python (ruff format + ruff --fix)
+    cmds:
+      - uv run ruff format lib tests cron 2>/dev/null || true
+      - uv run ruff check --fix lib tests cron 2>/dev/null || true
+
+  # ---------------------------------------------------------------
+  # Lint — Phase 0 ships ruff + shellcheck. Subsequent phases add:
+  #   - lint:mypy (when lib/ has type-annotated code)
+  #   - lint:schemas (when schemas/ ships)
+  #   - lint:frontmatter (when agents/, skills/ ship)
+  #   - lint:docs-drift (when ARCHITECTURE.md ships)
+  # ---------------------------------------------------------------
+  lint:
+    aliases: [l]
+    desc: Run available lints (ruff + shellcheck; expands per phase)
+    cmds:
+      - task: lint:ruff
+      - task: lint:shellcheck
+
+  lint:ruff:
+    desc: ruff check + ruff format --check
+    cmds:
+      - |
+        if [ -d lib ] || [ -d tests ] || [ -d cron ]; then
+          uv run ruff check lib tests cron 2>/dev/null || uv run ruff check lib
+          uv run ruff format --check lib tests cron 2>/dev/null || uv run ruff format --check lib
+        else
+          echo "no python sources yet (Phase 0); skipping ruff" >&2
+        fi
+
+  lint:mypy:
+    desc: mypy --strict (Phase 1+)
+    cmds:
+      - |
+        if [ -d lib ] && find lib -name '*.py' -print -quit | grep -q .; then
+          uv run mypy lib cron
+        else
+          echo "no python sources yet (Phase 0); skipping mypy" >&2
+        fi
+
+  lint:shellcheck:
+    desc: shellcheck on bash wrappers
+    cmds:
+      - |
+        files=$(find hooks scripts -name '*.sh' 2>/dev/null)
+        if [ -n "$files" ]; then
+          echo "$files" | xargs shellcheck
+        else
+          echo "no shell scripts yet (Phase 0); skipping shellcheck" >&2
+        fi
+
+  # The following lints are stubs for later phases. They're listed so
+  # `task --list` shows the full intended surface area.
+  lint:schemas:
+    desc: "[Phase 0 stub] JSON Schema validity (kicks in when schemas/ ships)"
+    cmds:
+      - test -d schemas && ls schemas/*.json >/dev/null 2>&1 || { echo "no schemas yet" >&2; exit 0; }
+
+  lint:frontmatter:
+    desc: "[Phase 0 stub] agents/ and skills/ frontmatter validity"
+    cmds:
+      - echo "frontmatter linter not implemented yet (Phase 1+)" >&2
+
+  lint:docs-drift:
+    desc: "[Phase 0 stub] docs ↔ filesystem drift"
+    cmds:
+      - echo "doc-drift linter not implemented yet (Phase 1+)" >&2
+
+  # ---------------------------------------------------------------
+  # Test — pytest + bats. Phase 0 has no real tests; placeholders pass.
+  # ---------------------------------------------------------------
+  test:
+    aliases: [t]
+    desc: Run unit + integration + bats (whatever exists)
+    cmds:
+      - task: test:unit
+      - task: test:integration
+      - task: test:bats
+
+  test:unit:
+    desc: pytest unit tests (excludes voyage / claude_cli markers)
+    cmds:
+      - |
+        if find tests/unit -name 'test_*.py' -print -quit 2>/dev/null | grep -q .; then
+          uv run pytest tests/unit -m "not voyage and not claude_cli"
+        else
+          echo "no unit tests yet (Phase 0); skipping" >&2
+        fi
+
+  test:integration:
+    desc: pytest integration tests
+    cmds:
+      - |
+        if find tests/integration -name 'test_*.py' -print -quit 2>/dev/null | grep -q .; then
+          uv run pytest tests/integration -m "not voyage and not claude_cli"
+        else
+          echo "no integration tests yet (Phase 0); skipping" >&2
+        fi
+
+  test:bats:
+    desc: bats tests for bash hook wrappers
+    cmds:
+      - |
+        if find tests/bats -name '*.bats' -print -quit 2>/dev/null | grep -q .; then
+          bats -r tests/bats/
+        else
+          echo "no bats tests yet (Phase 0); skipping" >&2
+        fi
+
+  test:full:
+    desc: All tests including voyage and claude_cli markers (needs API keys + claude CLI)
+    cmds:
+      - uv run pytest tests/ -m ""
+      - bats -r tests/bats/ 2>/dev/null || true
+
+  # ---------------------------------------------------------------
+  # Validate / CI mirroring
+  # ---------------------------------------------------------------
+  validate:
+    desc: Full pre-PR check (lint + test)
+    deps: [lint, test]
+
+  ci:replay:
+    desc: Mirror PR-time CI locally
+    cmds:
+      - task: lint
+      - task: test:unit
+      - task: test:bats
+
+  release:check:
+    desc: Sanity gate before tag bump
+    cmds:
+      - task: validate
+
+  # ---------------------------------------------------------------
+  # Doctor — verify required tooling is installed
+  # ---------------------------------------------------------------
+  doctor:
+    desc: Verify required tooling exists (python 3.12+, uv, git, gh, bash, shellcheck, bats, jq, node, npm)
+    cmds:
+      - |
+        missing=0
+        check() {
+          if command -v "$1" >/dev/null 2>&1; then
+            echo "  ok    $1"
+          else
+            echo "  MISS  $1" >&2
+            missing=1
+          fi
+        }
+        echo "required:"
+        check python3
+        check uv
+        check git
+        check bash
+        check jq
+        check shellcheck
+        check bats
+        echo "optional:"
+        check gh
+        check node
+        check npm
+        check shfmt
+        check actionlint
+        check claude
+        [ "$missing" = 0 ] || { echo "some required tools missing" >&2; exit 1; }
+
+  # ---------------------------------------------------------------
+  # Branch guard — refuse to operate on default branch
+  # ---------------------------------------------------------------
+  branch:guard:
+    desc: Fail if currently on main / master (use a feature branch)
+    cmds:
+      - |
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        case "$branch" in
+          main|master)
+            echo "ERROR: on '$branch', switch to a feature branch (git switch -c <name>)" >&2
+            exit 1
+            ;;
+          *)
+            echo "ok: on branch '$branch'" >&2
+            ;;
+        esac

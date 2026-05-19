@@ -1,0 +1,46 @@
+# kioku vault
+
+This is your Claude Code long-term memory vault, managed by [kioku](https://github.com/hir4ta/kioku).
+
+## What goes where
+
+- `working/` — your **live workspace**. `focus.md`, `next.md`, `unresolved.md` are auto-injected into every new Claude session.
+- `episodic/sessions/` — auto-generated session summaries. **Read these, don't edit** (kioku will re-render on next consolidation).
+- `semantic/decisions/active/` — decisions currently in force. **Edit these freely** — they shape future Claude responses.
+- `semantic/patterns/` `semantic/mistakes/` `semantic/preferences/` — knowledge layers.
+- `procedural/skills/` `procedural/recipes/` — reusable how-tos.
+- `projects/<slug>/` — project-specific memory. `focus.md` and `decisions/` mirror the global layout but scoped to one project.
+- `compact-handover/` — auto-generated PreCompact hand-off. Don't edit.
+- `_meta/dashboard.md` — Dataview-driven overview of the entire vault.
+
+## How memory entries are structured
+
+All entries follow the **MADR** (Markdown Architectural Decision Records) format:
+
+1. **Title** with the decision/finding on the first line.
+2. **Decision / TL;DR** right after the title (this is what chunk retrieval surfaces).
+3. **Why** and **Consequences** bullets.
+4. **Context** section **last** — only read if the reader needs background.
+
+Frontmatter is required and validated against `memory.schema.json`. See the kioku repo `templates/` directory for examples (`decision.md.tmpl`, `session-summary.md.tmpl`, `pattern.md.tmpl`).
+
+## Privacy
+
+Mark content you don't want indexed with `<no-memory>...</no-memory>` or `<private>...</private>`. The `redact.py` layer strips these before any Voyage API call. Secret-shaped strings (API keys, JWTs, high-entropy tokens) are auto-detected and blocked even without explicit tagging.
+
+## Working with this vault
+
+- Open it in **Obsidian** to browse, edit, and search like any other vault.
+- Run `kioku search <query>` to retrieve via hybrid (BM25 + Voyage embedding + rerank-2.5).
+- Run `kioku status` to see what kioku injected into your most recent session.
+- Run `kioku rebuild` if you bulk-edited files outside kioku and want the SQLite index regenerated.
+
+## Trust model
+
+Memories carry a `trust` frontmatter field:
+
+- `high` — written by you, by hand, in this vault.
+- `medium` — extracted by kioku from a Claude Code session you ran.
+- `low` — imported from external sources (rare; never auto-injected without explicit opt-in).
+
+`trust: low` records are stripped from injection by default. Override per-call with `kioku search --include-low-trust`.

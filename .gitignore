@@ -1,0 +1,134 @@
+# =============================================================================
+# Developer-only files — not shipped in the kioku plugin distribution.
+# CLAUDE.md / .claude/ / docs/ are not shared with teams either (solo-dev).
+# =============================================================================
+
+# Developer CLAUDE.md (the distributed README.md is separate; tracked)
+/CLAUDE.md
+
+# Developer Claude Code config (rules / skills / agents / settings)
+/.claude/
+
+# Research and decision logs (dev-only by default; whitelist user-facing docs)
+/docs/*
+!/docs/getting-started.md
+!/docs/architecture.md
+!/docs/threat-model.md
+!/docs/security-policy.md
+!/docs/benchmark.md
+
+# Local kioku state (if kioku is dogfooded against itself in this repo)
+/.kioku-cache/
+
+# Taskfile (go-task) checksum cache
+.task/
+
+# =============================================================================
+# OS / Editor
+# =============================================================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+.zed/
+
+# =============================================================================
+# Logs / temp files
+# =============================================================================
+
+*.log
+*.tmp
+/tmp/
+/tmp.*
+*.bak
+*.orig
+
+# =============================================================================
+# Secrets
+# =============================================================================
+
+.env
+.env.*
+!.env.example
+
+# kioku-specific: never commit user secrets or local config
+secrets.toml
+config.local.toml
+
+# Keys / certs / password stores
+*.pem
+*.key
+id_rsa*
+.aws/credentials
+.ssh/
+*.kdbx
+
+# =============================================================================
+# Tests / coverage
+# =============================================================================
+
+/coverage/
+*.bats.tmp
+.pytest_cache/
+.hypothesis/
+
+# Large test fixtures (vault snapshots, transcript dumps)
+/tests/fixtures/vault-large/
+/tests/fixtures/transcripts-large/
+
+# =============================================================================
+# Python
+# =============================================================================
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.python-version
+
+# uv lock is committed; uv cache is not
+.uv-cache/
+
+# =============================================================================
+# Node (dashboard)
+# =============================================================================
+
+node_modules/
+/dashboard/dist/
+/dashboard/.vite/
+
+# =============================================================================
+# kioku local stores (databases are derived from the vault; never commit)
+# =============================================================================
+
+/store/*.sqlite
+/store/*.sqlite-journal
+/store/*.sqlite-wal
+/store/*.sqlite-shm
+/store/*.duckdb
+/store/*.duckdb.wal
+
+# Embedding cache and access logs
+/store/cache/
+/store/access-log/
+
+# =============================================================================
+# Lint / link checker cache
+# =============================================================================
+
+/.lycheecache
+
+# =============================================================================
+# Build artifacts
+# =============================================================================
+
+/dist/
+/build/

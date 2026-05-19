@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hir4ta/kioku/schemas/memory.schema.json",
+  "title": "kiokuMemoryRecord",
+  "description": "Frontmatter schema for any Markdown memory file in the kioku vault. Validated by lib/vault.py on read and write.",
+  "type": "object",
+  "required": ["id", "type", "status", "created_at", "event_at", "source", "trust"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-\\d{4}-\\d{2}-\\d{2}-[a-z0-9-]+$",
+      "description": "Globally unique ID. Format: <TYPE_PREFIX>-YYYY-MM-DD-<kebab-slug>. Examples: DEC-2026-05-19-name-kioku, SESSION-2026-05-19-cache-impl, PAT-2026-04-12-bash-strict-mode."
+    },
+    "type": {
+      "enum": [
+        "session",
+        "decision",
+        "pattern",
+        "mistake",
+        "preference",
+        "reference",
+        "skill",
+        "recipe",
+        "person",
+        "glossary"
+      ],
+      "description": "Memory entry type. Determines which directory the file lives in and which retrieval scoring weights apply."
+    },
+    "status": {
+      "enum": ["active", "deprecated", "archived"],
+      "description": "Lifecycle status. 'deprecated' is set when superseded by another entry; 'archived' is set by the decay cron."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When kioku first ingested this record (ingestion_time in bi-temporal terms)."
+    },
+    "event_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the fact described was true (event_time). For decisions, the date the decision was made. For sessions, the session start time."
+    },
+    "last_accessed": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Most recent injection or read. Updated by lib/retrieve.py."
+    },
+    "access_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Cumulative injection count. Feeds the access_freq scoring axis (Generative Agents, arxiv 2304.03442)."
+    },
+    "importance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "LLM-rated importance 0-1. Set by the consolidation cron; user can override by hand."
+    },
+    "source": {
+      "enum": ["user-notes", "auto-extracted", "external"],
+      "description": "Provenance. Used by lib/trust.py to set the trust attribute on injection."
+    },
+    "trust": {
+      "enum": ["high", "medium", "low"],
+      "description": "Trust level for injection. 'low' is excluded from default injection (memory poisoning defense, MINJA arxiv 2503.03704)."
+    },
+    "project": {
+      "type": ["string", "null"],
+      "description": "Project slug if this memory is project-scoped, null for cross-project (global) memory."
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Free-form tags. Used for facet filtering in retrieval."
+    },
+    "related": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "IDs of related memories (cross-references)."
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "ID of the memory this entry replaces. Used by the conflict-resolution cron."
+    },
+    "deprecated_by": {
+      "type": ["string", "null"],
+      "description": "ID of the memory that has replaced this one. When non-null, this entry is excluded from default injection."
+    },
+    "pinned": {
+      "type": "boolean",
+      "default": false,
+      "description": "If true, this memory is force-injected on every SessionStart regardless of retrieval score."
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Session length in minutes (type=session only)."
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Claude Code session id (type=session only)."
+    },
+    "files_touched": {
+      "type": "integer",
+      "description": "Number of files modified during the session (type=session only)."
+    },
+    "next_action": {
+      "type": ["string", "null"],
+      "description": "Slug of the next action to resume on (type=session only)."
+    },
+    "domain": {
+      "type": "string",
+      "description": "Domain a pattern applies to (type=pattern only)."
+    },
+    "when_to_use": {
+      "type": "string",
+      "description": "One-line trigger condition (type=pattern only)."
+    },
+    "when_not_to_use": {
+      "type": "string",
+      "description": "One-line anti-trigger (type=pattern only)."
+    }
+  }
+}

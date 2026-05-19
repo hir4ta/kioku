@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hir4ta/kioku/schemas/settings.schema.json",
+  "title": "kiokuSettings",
+  "description": "Schema for ~/.config/kioku/config.toml. Loaded by lib/config.py.",
+  "type": "object",
+  "required": ["vault", "voyage"],
+  "additionalProperties": false,
+  "properties": {
+    "vault": {
+      "type": "object",
+      "required": ["path"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Absolute path to the Obsidian vault root (e.g. ~/Documents/Obsidian/Kioku). Tilde is expanded by lib/config.py."
+        },
+        "ignore_patterns": {
+          "type": "array",
+          "items": {"type": "string"},
+          "default": [".obsidian/**", "_meta/**", "**/*.tmp.md"],
+          "description": "Glob patterns excluded from ETL into the SQLite index."
+        }
+      }
+    },
+    "voyage": {
+      "type": "object",
+      "required": ["model_general"],
+      "additionalProperties": false,
+      "properties": {
+        "model_general": {
+          "type": "string",
+          "default": "voyage-4-large",
+          "description": "Model id used for general embeddings. See https://docs.voyageai.com/docs/embeddings."
+        },
+        "model_code": {
+          "type": "string",
+          "default": "voyage-code-3",
+          "description": "Model id used for code chunks."
+        },
+        "model_rerank": {
+          "type": "string",
+          "default": "rerank-2.5",
+          "description": "Model id used for rerank pass after hybrid retrieval."
+        },
+        "dim": {
+          "type": "integer",
+          "enum": [256, 512, 1024, 2048],
+          "default": 1024,
+          "description": "Embedding dimension. Matryoshka models support 256/512/1024/2048."
+        },
+        "monthly_budget_usd": {
+          "type": "number",
+          "minimum": 0,
+          "default": 20,
+          "description": "Soft cap on monthly Voyage spend. Surfaces a warning in _meta/dashboard.md when exceeded."
+        }
+      }
+    },
+    "inject": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "active_recall_token_cap": {
+          "type": "integer",
+          "default": 32000,
+          "description": "Maximum tokens of memory injected per session start. Based on NoLiMa (arxiv 2502.05167) which shows 128K models degrade past 32K with distractors."
+        },
+        "default_top_k": {
+          "type": "integer",
+          "default": 5,
+          "description": "Top-K after rerank for query-relevant injection."
+        },
+        "fetch_pool_size": {
+          "type": "integer",
+          "default": 20,
+          "description": "Size of the candidate pool before rerank (hybrid RRF returns this many)."
+        },
+        "cache_breakpoints": {
+          "type": "boolean",
+          "default": true,
+          "description": "If true, kioku emits prompt_cache_control hints around stable memory layers (BP1 1h TTL, BP2 5m TTL)."
+        }
+      }
+    },
+    "cron": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nightly_consolidate_time": {"type": "string", "default": "02:00"},
+        "decay_pass_time": {"type": "string", "default": "03:00"},
+        "conflict_scan_time": {"type": "string", "default": "04:00"},
+        "weekly_review_time": {"type": "string", "default": "sun 09:00"},
+        "benchmark_time": {"type": "string", "default": "sat 02:00"}
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storage": {
+          "enum": ["keyring", "env", "file"],
+          "default": "keyring",
+          "description": "Where to look up API keys. Lookup order: env always wins (override), then this preferred backend, then the others as fallback."
+        },
+        "keyring_service": {
+          "type": "string",
+          "default": "kioku",
+          "description": "keyring service name used to namespace stored secrets."
+        }
+      }
+    },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Generative-Agents-style scoring weights (arxiv 2304.03442). Must sum to 1.0.",
+      "properties": {
+        "relevance": {"type": "number", "default": 0.40},
+        "recency": {"type": "number", "default": 0.25},
+        "importance": {"type": "number", "default": 0.20},
+        "access_freq": {"type": "number", "default": 0.10},
+        "project_match": {"type": "number", "default": 0.05},
+        "recency_decay_days": {"type": "number", "default": 30, "description": "Half-life used in exp(-days_since/N)."}
+      }
+    }
+  }
+}

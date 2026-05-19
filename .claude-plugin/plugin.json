@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "kioku",
+  "version": "0.0.1",
+  "description": "A Claude Code plugin for persistent long-term memory across sessions. Session summaries, decisions, and patterns are written to a local Obsidian vault, indexed with Voyage embeddings + rerank, and just-in-time injected via lifecycle hooks.",
+  "author": {
+    "name": "Shunichi Hirata"
+  },
+  "homepage": "https://github.com/hir4ta/kioku",
+  "repository": "https://github.com/hir4ta/kioku",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "long-term-memory",
+    "voyage",
+    "obsidian",
+    "rag",
+    "semantic-search",
+    "hooks",
+    "ai-agent",
+    "claude-code"
+  ]
+}

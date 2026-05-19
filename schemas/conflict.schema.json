@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hir4ta/kioku/schemas/conflict.schema.json",
+  "title": "kiokuConflictRecord",
+  "description": "Schema for conflict-resolution records. Modeled after STALE benchmark (arxiv 2605.06527). Written by the conflict-scan cron, surfaced in _meta/dashboard.md and the Web dashboard.",
+  "type": "object",
+  "required": ["id", "memory_a", "memory_b", "similarity", "detected_at", "resolution"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^CONFLICT-\\d{4}-\\d{2}-\\d{2}-[a-z0-9]+$",
+      "description": "Globally unique ID."
+    },
+    "memory_a": {
+      "type": "string",
+      "description": "ID of the first (typically newer) memory."
+    },
+    "memory_b": {
+      "type": "string",
+      "description": "ID of the second (typically older) memory."
+    },
+    "similarity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Cosine similarity between the two memories' embeddings."
+    },
+    "predicate_opposed": {
+      "type": "boolean",
+      "description": "True if the LLM judge marked memory_a and memory_b as making opposing claims."
+    },
+    "detected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolution": {
+      "enum": ["pending", "a_wins", "b_wins", "merge", "coexist"],
+      "description": "Auto-resolution decision (newer wins by default) or user override."
+    },
+    "resolved_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "resolved_by": {
+      "enum": ["auto", "user", null]
+    },
+    "explanation": {
+      "type": "string",
+      "description": "LLM-generated rationale for the resolution. Read by humans during weekly review."
+    }
+  }
+}
