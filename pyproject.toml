@@ -81,6 +81,8 @@ ignore = [
   "S105",     # false positives on time strings like "03:00"
   "S608",     # SQL built with Literal-constrained identifiers, verified by hand
   "PLW0603",  # lazy-init via module-level cache is the established pattern
+  "RUF002",   # en-dash / em-dash in docstrings is intentional prose
+  "RUF003",   # same, for comments
 ]
 
 [tool.ruff.lint.per-file-ignores]

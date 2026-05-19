@@ -10,6 +10,7 @@ Subcommands:
                   dense + rerank.
 * ``status``    — Print vault + store statistics.
 * ``version``   — Print the kioku version.
+* ``hook``      — Claude Code lifecycle hook entry points (Phase 2+).
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from rich.table import Table
 
 from kioku import __version__
 from kioku.chunk import chunk_body
+from kioku.cli.hook import hook as hook_group
 from kioku.config import get_voyage_api_key, load_settings
 from kioku.embed import Embedder, content_hash
 from kioku.errors import KiokuError
@@ -84,6 +86,9 @@ def _db_path(_vault_path: Path) -> Path:
 def cli(verbose: bool) -> None:
     """kioku — persistent long-term memory for Claude Code."""
     _setup_logging(verbose)
+
+
+cli.add_command(hook_group)
 
 
 # ---------------------------------------------------------------------------

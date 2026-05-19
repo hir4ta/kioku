@@ -317,3 +317,37 @@ def path_for(
     if sub is None:
         raise VaultError(f"unknown memory type: {type_!r}")
     return vault_root / sub / f"{date}-{slug}.md"
+
+
+# ---------------------------------------------------------------------------
+# Plain Markdown — for working/ and compact-handover/ files
+# ---------------------------------------------------------------------------
+
+
+def read_plain_markdown(path: Path) -> str:
+    """Read a Markdown file without frontmatter validation.
+
+    Used for ``working/*.md`` and ``compact-handover/*.md`` files,
+    which are user-editable / auto-generated plain Markdown and
+    intentionally do *not* carry the strict frontmatter contract that
+    :func:`read_memory` enforces.
+    """
+    if not path.is_file():
+        raise VaultError(f"not a file: {path}")
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise VaultError(f"failed to read {path}: {exc}") from exc
+
+
+def first_heading(markdown: str) -> str | None:
+    """Return the text of the first ``#``-level heading, or ``None``.
+
+    Useful for synthesising a display title for plain-Markdown files
+    that have no frontmatter ``title`` field.
+    """
+    for line in markdown.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip()
+    return None
