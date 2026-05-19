@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel in-flight runs when the same ref receives a new push.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: lint + type + test (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 is the floor (requires-python = ">=3.12"). We also test the
+        # bleeding edge so kioku ships against what users are likely running.
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: uv sync
+        run: uv sync --all-extras --python ${{ matrix.python-version }}
+
+      - name: ruff check
+        run: uv run ruff check kioku tests
+
+      - name: ruff format --check
+        run: uv run ruff format --check kioku tests
+
+      - name: mypy strict
+        run: uv run mypy kioku
+
+      - name: pytest (no Voyage / claude_cli markers)
+        run: uv run pytest tests -m "not voyage and not claude_cli"
