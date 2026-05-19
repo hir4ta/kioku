@@ -13,10 +13,12 @@ keywords = [
 
 dependencies = [
   "voyageai>=0.3",
-  "sqlite-vec>=0.1.10",
+  "numpy>=1.26",                    # voyageai depends on it at import time
+  "sqlite-vec>=0.1.9",
   "duckdb>=1.1",
   "anthropic>=0.39",
   "python-frontmatter>=1.1",
+  "jsonschema>=4.23",               # validates memory frontmatter
   "pydantic>=2.9",
   "httpx>=0.28",
   "tenacity>=9.0",
@@ -33,7 +35,7 @@ dev = [
   "pytest-cov>=6.0",
   "ruff>=0.8",
   "mypy>=1.13",
-  "types-python-frontmatter",
+  "types-jsonschema>=4.23",
   "hypothesis>=6.115",
 ]
 
@@ -45,8 +47,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["lib"]
-include = ["lib/**/*.py"]
+packages = ["kioku"]
 
 # ---------------------------------------------------------------------------
 # ruff (lint + format)
@@ -74,14 +75,20 @@ select = [
   "RUF",      # ruff-specific
 ]
 ignore = [
-  "E501",   # line length (formatter handles it)
-  "S101",   # assert ok in tests
-  "PLR0913", # too many args
+  "E501",     # line length (formatter handles it)
+  "S101",     # assert ok in tests
+  "PLR0913",  # too many args
+  "S105",     # false positives on time strings like "03:00"
+  "S608",     # SQL built with Literal-constrained identifiers, verified by hand
+  "PLW0603",  # lazy-init via module-level cache is the established pattern
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "PLR2004"]
-"lib/_scratch/**" = ["ALL"]
+# pytest idioms produce a small set of false positives we deliberately accept:
+#   ARG001 — fixtures (e.g. `monkeypatch`) are required as parameters but not referenced in the body
+#   PLC0415 — imports inside fixtures isolate optional dependencies per-test
+#   ARG005 — lambdas used as stubs intentionally have wider signatures than they use
+"tests/**" = ["S", "PLR2004", "ARG001", "ARG005", "PLC0415"]
 
 [tool.ruff.format]
 quote-style = "double"
