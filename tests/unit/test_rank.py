@@ -87,7 +87,8 @@ def test_deprecated_factor_reduces_score_strongly() -> None:
     base = score(_inputs(relevance=1.0, importance=1.0), scoring=cfg, now=_now())
     deprecated = score(
         _inputs(relevance=1.0, importance=1.0, deprecated=True),
-        scoring=cfg, now=_now(),
+        scoring=cfg,
+        now=_now(),
     )
     assert abs(deprecated - base * 0.1) < 1e-6
 
@@ -104,7 +105,8 @@ def test_both_modifiers_multiply() -> None:
     base = score(_inputs(relevance=1.0), scoring=cfg, now=_now())
     both = score(
         _inputs(relevance=1.0, deprecated=True, trust_low=True),
-        scoring=cfg, now=_now(),
+        scoring=cfg,
+        now=_now(),
     )
     # 0.1 * 0.5 = 0.05
     assert abs(both - base * 0.05) < 1e-6
@@ -115,7 +117,8 @@ def test_future_event_at_does_not_explode_decay() -> None:
     cfg = ScoringConfig()
     future = score(
         _inputs(event_at=_now() + dt.timedelta(days=30)),
-        scoring=cfg, now=_now(),
+        scoring=cfg,
+        now=_now(),
     )
     fresh = score(_inputs(event_at=_now()), scoring=cfg, now=_now())
     # days_since clamps to 0 → both should produce identical recency contribution.

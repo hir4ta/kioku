@@ -79,7 +79,9 @@ def _ingest_vault(tmp_path: Path) -> Path:
     vault = tmp_path / "vault"
     vault.mkdir()
     scaffold(vault, write_claude_md=False)
-    _write_decision(vault, "voyage", "# Use voyage-4-large\n\nDecided to use Voyage for embeddings.")
+    _write_decision(
+        vault, "voyage", "# Use voyage-4-large\n\nDecided to use Voyage for embeddings."
+    )
     _write_decision(vault, "sqlite", "# Use sqlite-vec\n\nLocal hybrid index lives in sqlite.")
     _write_decision(vault, "obsidian", "# Use Obsidian\n\nVault is the source of truth.")
 
@@ -136,9 +138,7 @@ def test_hybrid_search_returns_ranked_hits(
         ]
         stub_voyage.rerank.return_value = rerank_response
 
-        hits = hybrid_search(
-            conn, "voyage", settings=settings, embedder=embedder, top_k=5
-        )
+        hits = hybrid_search(conn, "voyage", settings=settings, embedder=embedder, top_k=5)
 
     assert hits, "hybrid_search returned no hits"
     # The "voyage" decision should be the top hit.
@@ -158,9 +158,7 @@ def test_hybrid_search_bm25_only_when_no_embedder(
     settings = load_settings()
 
     with connect(db_path) as conn:
-        hits = hybrid_search(
-            conn, "obsidian", settings=settings, embedder=None, top_k=3
-        )
+        hits = hybrid_search(conn, "obsidian", settings=settings, embedder=None, top_k=3)
 
     assert hits, "BM25-only retrieval should still return hits"
     # No rerank ran, so rerank_score is None on every hit.
