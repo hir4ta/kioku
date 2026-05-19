@@ -250,9 +250,7 @@ def get_voyage_api_key(settings: KiokuSettings | None = None) -> str:
     try:
         import keyring  # noqa: PLC0415 — lazy import to keep startup cheap
     except ImportError as exc:  # pragma: no cover — keyring is a direct dep
-        raise ConfigError(
-            "keyring is not installed and $VOYAGE_API_KEY is not set"
-        ) from exc
+        raise ConfigError("keyring is not installed and $VOYAGE_API_KEY is not set") from exc
 
     keyring_value: str | None = keyring.get_password(
         resolved.secrets.keyring_service, KEYRING_ACCOUNT_VOYAGE

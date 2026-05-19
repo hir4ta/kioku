@@ -178,8 +178,7 @@ def rebuild() -> None:
             chunk_count += len(pieces)
 
         console.print(
-            f"[green]rebuild complete[/green] — "
-            f"{memory_count} memories, {chunk_count} chunks"
+            f"[green]rebuild complete[/green] — {memory_count} memories, {chunk_count} chunks"
         )
 
 
@@ -232,8 +231,7 @@ def status() -> None:
     console.print(f"[bold]vault path:[/bold]  {settings.vault_path}")
     console.print(f"[bold]db path:[/bold]     {db_path}")
     console.print(
-        f"[bold]voyage:[/bold]      "
-        f"{settings.voyage.model_general}, dim={settings.voyage.dim}"
+        f"[bold]voyage:[/bold]      {settings.voyage.model_general}, dim={settings.voyage.dim}"
     )
 
     if not db_path.is_file():

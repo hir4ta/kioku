@@ -347,9 +347,7 @@ def insert_chunks(conn: sqlite3.Connection, batch: list[ChunkInsert]) -> list[in
         parent_id: int | None = None
         if c.parent_in_batch is not None:
             if c.parent_in_batch >= len(db_ids):
-                raise StoreError(
-                    f"forward parent reference in batch: {c.parent_in_batch}"
-                )
+                raise StoreError(f"forward parent reference in batch: {c.parent_in_batch}")
             parent_id = db_ids[c.parent_in_batch]
 
         cur = conn.execute(
@@ -579,14 +577,10 @@ class StoreStats:
 def stats(conn: sqlite3.Connection) -> StoreStats:
     memory_count = int(conn.execute("SELECT COUNT(*) AS n FROM memories").fetchone()["n"])
     chunk_count = int(conn.execute("SELECT COUNT(*) AS n FROM chunks").fetchone()["n"])
-    cache_count = int(
-        conn.execute("SELECT COUNT(*) AS n FROM embedding_cache").fetchone()["n"]
-    )
+    cache_count = int(conn.execute("SELECT COUNT(*) AS n FROM embedding_cache").fetchone()["n"])
     by_type = {
         row["type"]: int(row["n"])
-        for row in conn.execute(
-            "SELECT type, COUNT(*) AS n FROM memories GROUP BY type"
-        ).fetchall()
+        for row in conn.execute("SELECT type, COUNT(*) AS n FROM memories GROUP BY type").fetchall()
     }
     by_project = {
         (row["project"] or "<global>"): int(row["n"])

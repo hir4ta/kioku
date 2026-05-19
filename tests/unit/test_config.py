@@ -46,7 +46,7 @@ def test_load_settings_parses_toml(tmp_path: Path) -> None:
 
 def test_load_settings_rejects_unknown_top_level(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
-    path.write_text('bogus_section = true\n', encoding="utf-8")
+    path.write_text("bogus_section = true\n", encoding="utf-8")
     with pytest.raises(ConfigError):
         load_settings(path=path)
 
@@ -58,9 +58,7 @@ def test_load_settings_rejects_unknown_subkey(tmp_path: Path) -> None:
         load_settings(path=path)
 
 
-def test_env_overrides_vault_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_env_overrides_vault_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     override = tmp_path / "alt-vault"
     monkeypatch.setenv(ENV_VAULT_PATH, str(override))
     settings = load_settings(path=tmp_path / "nonexistent.toml")

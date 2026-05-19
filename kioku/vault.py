@@ -53,29 +53,29 @@ VAULT_SUBDIRS: tuple[str, ...] = (
 )
 
 TYPE_TO_SUBDIR: dict[str, str] = {
-    "session":    "episodic/sessions",
-    "decision":   "semantic/decisions/active",
-    "pattern":    "semantic/patterns",
-    "mistake":    "semantic/mistakes",
+    "session": "episodic/sessions",
+    "decision": "semantic/decisions/active",
+    "pattern": "semantic/patterns",
+    "mistake": "semantic/mistakes",
     "preference": "semantic/preferences",
-    "reference":  "semantic/references",
-    "skill":      "procedural/skills",
-    "recipe":     "procedural/recipes",
-    "person":     "people",
-    "glossary":   "semantic/glossary",
+    "reference": "semantic/references",
+    "skill": "procedural/skills",
+    "recipe": "procedural/recipes",
+    "person": "people",
+    "glossary": "semantic/glossary",
 }
 
 TYPE_PREFIX: dict[str, str] = {
-    "session":    "SESSION",
-    "decision":   "DEC",
-    "pattern":    "PAT",
-    "mistake":    "MIS",
+    "session": "SESSION",
+    "decision": "DEC",
+    "pattern": "PAT",
+    "mistake": "MIS",
     "preference": "PREF",
-    "reference":  "REF",
-    "skill":      "SKILL",
-    "recipe":     "RECIPE",
-    "person":     "PERSON",
-    "glossary":   "GLOSS",
+    "reference": "REF",
+    "skill": "SKILL",
+    "recipe": "RECIPE",
+    "person": "PERSON",
+    "glossary": "GLOSS",
 }
 
 ID_PATTERN = re.compile(r"^[A-Z]+-\d{4}-\d{2}-\d{2}-[a-z0-9-]+$")
@@ -188,13 +188,10 @@ def _validate_frontmatter(fm: dict[str, Any], *, source_path: Path) -> None:
         jsonschema.validate(fm, schema)
     except jsonschema.ValidationError as exc:
         raise SchemaError(
-            f"frontmatter invalid in {source_path}: {exc.message} "
-            f"at {list(exc.absolute_path)}"
+            f"frontmatter invalid in {source_path}: {exc.message} at {list(exc.absolute_path)}"
         ) from exc
     if not ID_PATTERN.match(str(fm.get("id", ""))):
-        raise SchemaError(
-            f"id pattern mismatch in {source_path}: id={fm.get('id')!r}"
-        )
+        raise SchemaError(f"id pattern mismatch in {source_path}: id={fm.get('id')!r}")
 
 
 def read_memory(path: Path) -> MemoryRecord:

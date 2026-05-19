@@ -167,9 +167,7 @@ class Embedder:
             h = content_hash(text)
             cached = self._cache_get(h, model)
             if cached is not None:
-                results[i] = EmbedResult(
-                    vector=cached, model=model, dim=len(cached), cached=True
-                )
+                results[i] = EmbedResult(vector=cached, model=model, dim=len(cached), cached=True)
                 continue
             if h not in miss_indices:
                 miss_indices[h] = []
@@ -212,9 +210,7 @@ class Embedder:
         input_type: InputType,
     ) -> list[list[float]]:
         try:
-            response: Any = self._client.embed(
-                texts, model=model, input_type=input_type
-            )
+            response: Any = self._client.embed(texts, model=model, input_type=input_type)
         except Exception as exc:
             log.warning("voyage call failed: %s", exc)
             raise EmbedError(str(exc)) from exc
@@ -222,8 +218,7 @@ class Embedder:
         embeddings = getattr(response, "embeddings", None)
         if embeddings is None:
             raise EmbedError(
-                f"voyage response missing 'embeddings' attribute "
-                f"(got {type(response).__name__})"
+                f"voyage response missing 'embeddings' attribute (got {type(response).__name__})"
             )
         vectors = [list(v) for v in embeddings]
         if self._dim < VOYAGE_DEFAULT_DIM:

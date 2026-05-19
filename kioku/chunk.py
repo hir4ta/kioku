@@ -73,7 +73,7 @@ class Chunk:
     """
 
     body: str
-    section: str                       # 'decision' | 'rationale' | 'context' | 'body' | 'toc' | ...
+    section: str  # 'decision' | 'rationale' | 'context' | 'body' | 'toc' | ...
     token_count: int
     heading_path: tuple[str, ...]
     parent_index: int | None = None
@@ -201,13 +201,13 @@ def _parse_sections(text: str) -> list[_Section]:
 
 
 _SECTION_KEYWORDS: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("decision", "tl;dr", "what was done"),    "decision"),
-    (("why", "rationale"),                       "rationale"),
-    (("consequence", "trade-off", "tradeoff"),  "consequences"),
-    (("context", "background"),                 "context"),
-    (("verification", "verify"),                "verification"),
-    (("next", "todo"),                          "next"),
-    (("open question", "unresolved"),           "open"),
+    (("decision", "tl;dr", "what was done"), "decision"),
+    (("why", "rationale"), "rationale"),
+    (("consequence", "trade-off", "tradeoff"), "consequences"),
+    (("context", "background"), "context"),
+    (("verification", "verify"), "verification"),
+    (("next", "todo"), "next"),
+    (("open question", "unresolved"), "open"),
 )
 
 
