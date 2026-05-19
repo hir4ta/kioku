@@ -165,8 +165,8 @@ declared in `hooks.json` only after the corresponding phase lands.
 | SessionStart     | `clear`       | 2 ✓   | Same as `startup` (clear = fresh context, same priors) |
 | SessionStart     | `compact`     | 2 ✓   | Inject the most recent `compact-handover/<session>.md` (full), plus identifier-only `working/` |
 | PreCompact       | any           | 5     | Extract decisions / TODOs via `claude -p`, write the hand-off file |
-| SessionEnd       | (none)        | 4     | Persist transcript summary, embed, upsert SQLite (async) |
-| Stop             | (none, async) | 4     | Mirror SessionEnd; uses latest-mtime resolution to dodge the `transcript_path` stale bug ([issue #8564](https://github.com/anthropics/claude-code/issues/8564)) |
+| SessionEnd       | (none)        | 4 ✓   | Parse transcript, redact secrets, write `episodic/sessions/<date>-<slug>.md` (async, fail-open) |
+| Stop             | (none, async) | 4 ✓   | Mirror SessionEnd with latest-mtime resolution to dodge the `transcript_path` stale bug ([issue #8564](https://github.com/anthropics/claude-code/issues/8564)) |
 | UserPromptSubmit | any, optional | 7     | Per-prompt BM25 prefetch within a 2-second budget — deferred to Phase 7 alongside trust hardening; see decisions log |
 
 ### SessionStart injection shape (Phase 2)
@@ -259,8 +259,8 @@ The project ships in nine phases, each landing as a single PR.
 | 0     | Scaffolding, plugin manifest, vault templates, decision log          | Complete      |
 | 1     | L4 → L3 ETL (`kioku.vault`, `kioku.chunk`, `kioku.embed`, `kioku.store_sqlite`, CLI) | Complete |
 | 2     | SessionStart × 4 + `kioku.inject` + bash wrappers + `hooks.json`      | Complete      |
-| 3     | Hybrid retrieve + Voyage rerank + BM25 prefetch into `query_relevant` | In progress   |
-| 4     | SessionEnd + Stop hooks + Claude-driven `working/` updates            | Pending       |
+| 3     | Hybrid retrieve + Voyage rerank + BM25 prefetch into `query_relevant` | Complete      |
+| 4     | SessionEnd + Stop hooks + `kioku.redact` + `kioku.transcript` + Claude-driven `working/` | In progress |
 | 5     | PreCompact + SessionStart(compact) + structured extraction via `claude -p` | Pending |
 | 6     | Cron jobs (consolidate, decay, conflict, weekly review)               | Pending       |
 | 7     | Trust hardening + LongMemEval benchmark suite                         | Pending       |

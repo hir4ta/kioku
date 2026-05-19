@@ -3,16 +3,18 @@
 This module is the Python side of the bash wrappers in
 ``hooks/memory/``. The wrappers shell out here with the matched event
 and source; this module reads the Claude Code hook payload from stdin,
-decides what to inject, and writes the spec-compliant response JSON to
-stdout.
+decides what to do, and writes a spec-compliant response JSON to stdout.
 
-Phase 2 ships ``session-start`` for the four SessionStart matchers
-(``startup`` / ``resume`` / ``clear`` / ``compact``). PreCompact,
-SessionEnd, Stop, and UserPromptSubmit subcommands land in Phases 4–5.
+Subcommands by Phase:
 
-The hook is **fail-open**: any unexpected exception is caught, logged
-to stderr, and replaced with an empty ``additionalContext`` so a
-broken kioku install never blocks the user from starting a session.
+* Phase 2 — ``session-start`` (4 matchers).
+* Phase 4 — ``session-end`` and ``stop`` (transcript → vault write).
+* Phase 5 — ``pre-compact``.
+* Phase 7 — ``user-prompt-submit``.
+
+Every hook is **fail-open**: any unexpected exception is caught,
+logged, and replaced with an empty response. A broken kioku install
+never blocks the user from starting, resuming, or ending a session.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -36,7 +39,21 @@ from kioku.inject import (
 )
 from kioku.retrieve import hybrid_search
 from kioku.store_sqlite import connect
-from kioku.vault import first_heading, read_memory, read_plain_markdown
+from kioku.transcript import (
+    TranscriptTurn,
+    latest_transcript,
+    parse_transcript,
+    summarize_machine,
+)
+from kioku.vault import (
+    MemoryRecord,
+    first_heading,
+    make_id,
+    path_for,
+    read_memory,
+    read_plain_markdown,
+    write_memory,
+)
 
 # Maximum chars of the focus body fed into BM25 as a retrieval query.
 # Longer queries hurt both BM25 idf and our 2-second hook budget.
@@ -77,6 +94,32 @@ def hook_session_start(source: SessionStartSource) -> None:
     """
     response = _safe_session_start(source)
     json.dump(response, sys.stdout)
+    sys.stdout.write("\n")
+
+
+@hook.command("session-end")
+def hook_session_end() -> None:
+    """Persist the just-finished session as ``episodic/sessions/*.md``.
+
+    Reads transcript_path from the hook payload, parses + redacts the
+    JSONL, writes a session memory to the vault. Returns ``{}`` —
+    SessionEnd does not inject context.
+    """
+    _safe_session_end(use_latest_mtime=False)
+    json.dump({}, sys.stdout)
+    sys.stdout.write("\n")
+
+
+@hook.command("stop")
+def hook_stop() -> None:
+    """Mirror of SessionEnd that uses latest-mtime resolution.
+
+    Claude Code issue #8564 occasionally hands hooks a stale
+    ``transcript_path``. Stop uses :func:`kioku.transcript.latest_transcript`
+    to pick the freshest ``.jsonl`` in the same directory.
+    """
+    _safe_session_end(use_latest_mtime=True)
+    json.dump({}, sys.stdout)
     sys.stdout.write("\n")
 
 
@@ -368,3 +411,96 @@ def _append_active_decisions_index(
                 body=None,
             )
         )
+
+
+# ---------------------------------------------------------------------------
+# SessionEnd / Stop — write transcript summary to vault
+# ---------------------------------------------------------------------------
+
+
+def _safe_session_end(*, use_latest_mtime: bool) -> None:
+    """Run :func:`_do_session_end` swallowing every failure."""
+    try:
+        payload_in = _read_hook_stdin()
+        settings = load_settings()
+        _do_session_end(payload_in, settings, use_latest_mtime=use_latest_mtime)
+    except Exception as exc:
+        log.warning("session-end hook failed: %s", exc)
+
+
+def _do_session_end(
+    payload_in: dict[str, Any],
+    settings: KiokuSettings,
+    *,
+    use_latest_mtime: bool,
+) -> None:
+    """Materialise the transcript into ``episodic/sessions/<date>-<slug>.md``."""
+    raw_path = payload_in.get("transcript_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        log.debug("session-end: no transcript_path in payload")
+        return
+    hinted = Path(raw_path)
+    actual = latest_transcript(hinted) if use_latest_mtime else hinted
+    if actual is None or not actual.is_file():
+        log.debug("session-end: transcript not found at %s", hinted)
+        return
+
+    turns = parse_transcript(actual)
+    if not turns:
+        log.debug("session-end: empty transcript at %s", actual)
+        return
+
+    summary = summarize_machine(turns)
+    session_id = str(payload_in.get("session_id") or "unknown")
+
+    vault_root = settings.vault_path
+    if not vault_root.is_dir():
+        log.debug("session-end: vault root missing at %s", vault_root)
+        return
+
+    now = dt.datetime.now(dt.UTC)
+    slug = _session_slug(turns, session_id)
+    memory_id = make_id("session", slug, on=now.date())
+    target = path_for(vault_root, "session", slug, on=now.date())
+
+    event_at = turns[0].timestamp.isoformat() if turns[0].timestamp is not None else now.isoformat()
+    frontmatter: dict[str, Any] = {
+        "id": memory_id,
+        "type": "session",
+        "status": "active",
+        "created_at": now.isoformat(),
+        "event_at": event_at,
+        "source": "auto-extracted",
+        "trust": "medium",
+        "tags": [],
+        "session_id": session_id,
+        "importance": 0.4,
+        "duration_minutes": _duration_minutes(turns),
+        "files_touched": 0,  # Phase 5 wires real file-touch counting via claude -p
+        "next_action": None,
+    }
+
+    record = MemoryRecord(path=target, frontmatter=frontmatter, body=summary)
+    write_memory(record)
+    log.info("session-end: wrote %s", target)
+
+
+def _session_slug(turns: list[TranscriptTurn], session_id: str) -> str:
+    """Synthesise a short slug from the first user turn, or session_id fallback."""
+    user_first = next((t for t in turns if t.role == "user"), None)
+    if user_first and user_first.content.strip():
+        first_line = user_first.content.strip().splitlines()[0]
+        words = re.findall(r"[a-z0-9]+", first_line.lower())[:6]
+        if words:
+            return "-".join(words)
+    safe = re.sub(r"[^a-z0-9]+", "-", session_id.lower()).strip("-")
+    return safe[:24] or "session"
+
+
+def _duration_minutes(turns: list[TranscriptTurn]) -> int:
+    """Estimate session length from first / last timestamps. 0 if unknown."""
+    timestamps = [t.timestamp for t in turns if t.timestamp is not None]
+    if len(timestamps) < 2:  # noqa: PLR2004 — need two endpoints to subtract
+        return 0
+    delta = timestamps[-1] - timestamps[0]
+    return max(0, int(delta.total_seconds() // 60))
